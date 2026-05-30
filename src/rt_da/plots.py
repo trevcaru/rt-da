@@ -157,8 +157,10 @@ def plot_distributions(fit: SDTFit, ax=None):
     crit = fit.criteria[len(fit.criteria) // 2]
     ax.axvline(crit, color=_PALETTE["accent"], lw=1.6, ls=(0, (4, 2)),
                zorder=4)
-    ax.text(crit, ax.get_ylim()[1] * 0.96, "  criterion",
-            color=_PALETTE["accent"], fontsize=8.5, va="top", ha="left")
+    # label placed low and vertically along the line, clear of the legend
+    # (upper-right) and the da box (upper-left)
+    ax.text(crit, ax.get_ylim()[1] * 0.45, "criterion ", rotation=90,
+            color=_PALETTE["accent"], fontsize=8.5, va="center", ha="right")
 
     # annotate da
     ax.text(0.02, 0.96, f"da = {fit.da:.2f}", transform=ax.transAxes,
@@ -258,8 +260,10 @@ def plot_overestimation(grp_df, ax=None):
     bars = ax.bar(xpos, means, yerr=sems, width=0.62, color=colors,
                   edgecolor="white", linewidth=1.2, zorder=3,
                   error_kw=dict(ecolor="#5F6368", lw=1.3, capsize=4))
-    for b, m in zip(bars, means):
-        ax.text(b.get_x() + b.get_width() / 2, b.get_height(),
+    # place each value label just above the top of its error bar so the
+    # number never collides with the error-bar cap
+    for b, m, e in zip(bars, means, sems):
+        ax.text(b.get_x() + b.get_width() / 2, m + e + max(means) * 0.03,
                 f"{m:.2f}", ha="center", va="bottom", fontsize=9.5,
                 fontweight="bold", color=_PALETTE["accent"])
 
@@ -267,7 +271,7 @@ def plot_overestimation(grp_df, ax=None):
     ax.set_xticklabels(labels, fontsize=9.5)
     _style_ax(ax, title="d′ overestimates sensitivity vs da",
               ylabel="sensitivity")
-    ax.set_ylim(0, max(means) * 1.22)
+    ax.set_ylim(0, max(means) * 1.30)
     ax.grid(axis="x", visible=False)
     return ax
 

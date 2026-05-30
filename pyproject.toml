@@ -9,7 +9,7 @@ description = "RT-based unequal-variance signal detection (da) - estimate da fro
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "Your Name", email = "you@example.com" }]
+authors = [{ name = "Trevor Caruso", email = "glopule@yahoo.com" }]
 keywords = [
     "signal detection theory", "SDT", "psychophysics", "metacognition",
     "response time", "da", "d-prime", "unequal variance", "ROC",
@@ -32,8 +32,8 @@ plots = ["matplotlib>=3.4"]
 dev = ["pytest>=7.0", "matplotlib>=3.4"]
 
 [project.urls]
-Homepage = "https://github.com/yourname/rt-da"
-Repository = "https://github.com/yourname/rt-da"
+Homepage = "https://github.com/trevcaru/rt-da"
+Repository = "https://github.com/trevcaru/rt-da"
 Funding = "https://ko-fi.com/trevcaru"
 "Reference paper" = "https://doi.org/10.1016/j.isci.2026.114998"
 

@@ -1,7 +1,7 @@
 # GitHub reads this file and shows a "Sponsor" button on the repository.
 # Fill in the usernames you actually create; delete the lines you don't use.
 
-github: yourusername          # -> enables GitHub Sponsors button (fill in if you set it up)
+# github: yourusername       # uncomment + fill in if you set up GitHub Sponsors
 ko_fi: trevcaru               # -> Ko-fi one-time / recurring tips
 # buy_me_a_coffee: yourname   # uncomment if you prefer Buy Me a Coffee
 # patreon: yourname           # uncomment if you set up Patreon
