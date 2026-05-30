@@ -23,6 +23,12 @@ using *faster RT as a proxy for higher confidence*, following:
 This is an independent Python implementation. The authors' original R code is
 at <https://github.com/kiyomiyoshi/rt_type1_roc>.
 
+![Model overview: the unequal-variance SDT model fitted to RT data, with the type-1 ROC and z-ROC.](docs/rtda_fig1_model_overview.png)
+
+*The two internal distributions (target-absent vs target-present, σ > 1), the
+type-1 ROC the model fits, and the z-ROC whose slope is 1/σ. Recovered from
+simulated data with known parameters.*
+
 ---
 
 ## Why this package
@@ -38,6 +44,12 @@ at <https://github.com/kiyomiyoshi/rt_type1_roc>.
 - **Honest about RT.** Every dual fit reports the RT-based *and*
   confidence-based estimate side by side, plus whether RT actually tracks
   confidence in *your* data (it doesn't always — e.g. memory tasks).
+
+![RT-based da agrees closely with confidence-based da; conventional d′ overestimates sensitivity.](docs/rtda_fig2_rt_vs_confidence.png)
+
+*Left: RT-based and confidence-based da agree closely across subjects.
+Right: conventional equal-variance d′ overestimates sensitivity relative to
+either da measure — the core point of the method.*
 
 ## Install
 
@@ -93,6 +105,11 @@ suite:
 pip install "rt-da[dev]"
 pytest
 ```
+
+![Parameter recovery: estimated da closely tracks true da across simulated subjects.](docs/rtda_fig3_recovery.png)
+
+*Parameter recovery on simulated data: estimated da tracks the true value
+across the full range.*
 
 ## Notes & caveats
 
