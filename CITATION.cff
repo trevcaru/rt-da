@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software and the original method paper (see references)."
+title: "rt-da: RT-based unequal-variance signal detection (da) in Python"
+abstract: >-
+  An independent Python implementation for estimating unequal-variance
+  signal detection sensitivity (da) from response times -- using faster RT as a
+  proxy for confidence -- as well as from confidence ratings. Implements the
+  method of Miyoshi, Rahnev & Lau (2026) and is validated to reproduce their
+  reference implementation's published example and per-subject estimates.
+type: software
+authors:
+  - given-names: Trevor
+    family-names: Caruso
+    orcid: "https://orcid.org/0000-0001-7204-5230"
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/trevcaru/rt-da"
+url: "https://github.com/trevcaru/rt-da"
+keywords:
+  - signal detection theory
+  - SDT
+  - psychophysics
+  - metacognition
+  - response time
+  - da
+  - unequal variance
+  - ROC
+references:
+  - type: article
+    title: "Correcting for unequal variance in signal detection models using response time"
+    authors:
+      - given-names: Kiyofumi
+        family-names: Miyoshi
+      - given-names: Dobromir
+        family-names: Rahnev
+      - given-names: Hakwan
+        family-names: Lau
+    journal: "iScience"
+    volume: 29
+    year: 2026
+    doi: "10.1016/j.isci.2026.114998"

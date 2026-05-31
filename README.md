@@ -12,9 +12,12 @@ fixes this:
 da = μ / sqrt((1 + σ²) / 2)
 ```
 
-Fitting `da` normally needs multiple points in ROC space — usually from
-confidence ratings. This package also estimates it from **response times**,
-using *faster RT as a proxy for higher confidence*, following:
+Fitting `da` normally needs multiple points in ROC space, traditionally from
+confidence ratings, which may not be available. This package estimates
+`da` from **response times alone**, using *faster RT as a proxy for higher
+confidence* so you can get unequal-variance sensitivity from plain
+stimulus / response / RT data. (If you *do*have confidence, it will fit that, 
+and can compare the two.) Following:
 
 > Miyoshi, K., Rahnev, D., & Lau, H. (2026). *Correcting for unequal variance
 > in signal detection models using response time.* iScience 29, 114998.
@@ -31,7 +34,7 @@ simulated data with known parameters.*
 
 ---
 
-## Why this package
+## Overview
 
 - **Python-native.** The reference implementation is R; this fits cleanly into
   PsychoPy / pandas / SciPy workflows.
@@ -40,16 +43,17 @@ simulated data with known parameters.*
   datasets (Mazor 2020, Sherman 2016). See `tests/`.
 - **Does more than the paper packages:** RT-validity diagnostics, bootstrap
   confidence intervals, tidy group-level batch fitting, and publication-style
-  plots — all included, all free.
-- **Honest about RT.** Every dual fit reports the RT-based *and*
-  confidence-based estimate side by side, plus whether RT actually tracks
-  confidence in *your* data (it doesn't always — e.g. memory tasks).
+  plots are all included.
+- **Works with RT alone.** The main use case: estimate `da` from
+  stimulus / response / RT, no confidence ratings needed. If confidence *is*
+  available, the package can fit it too and report both side by side, and
+  check whether RT tracks confidence in your data.
 
 ![RT-based da agrees closely with confidence-based da; conventional d′ overestimates sensitivity.](docs/rtda_fig2_rt_vs_confidence.png)
 
 *Left: RT-based and confidence-based da agree closely across subjects.
 Right: conventional equal-variance d′ overestimates sensitivity relative to
-either da measure — the core point of the method.*
+either da measure.*
 
 ## Install
 
@@ -60,26 +64,36 @@ pip install "rt-da[plots]"   # + matplotlib for the plotting helpers
 
 ## Quick start
 
+The core workflow needs only stimulus, response, and RT (confidence optional):
+
 ```python
 import rt_da
 
 # Trial-level arrays: stimulus (1=present, 0=absent),
-# response (1=yes, 0=no), rt (seconds), confidence (1..n)
+# response (1=yes, 0=no), rt (seconds)
 fit = rt_da.rt_da(stimulus, response, rt, n_bins=3)
 print(fit.da, fit.sigma, fit.mu, fit.dprime)
 
-# Compare RT-based vs confidence-based estimates on the same trials
-dual = rt_da.compare_rt_confidence(stimulus, response, rt, confidence)
-print(dual.summary())
-
-# Is RT a valid proxy in your data?
-print(rt_da.rt_validity(rt, confidence))
-
-# Confidence intervals
+# Confidence intervals (RT only)
 ci = rt_da.rt_da_ci(stimulus, response, rt, n_boot=2000)
 print(ci["da"])   # (estimate, lo, hi)
 
-# Batch over subjects in a tidy DataFrame
+# Batch over subjects in a tidy DataFrame (rt only; confidence optional)
+table = rt_da.fit_group(df, subject="subj", stimulus="stim",
+                        response="resp", rt="rt")
+```
+
+If you also collected confidence ratings, you can fit those and compare:
+
+```python
+# Fit confidence directly, or compare RT-based vs confidence-based da
+dual = rt_da.compare_rt_confidence(stimulus, response, rt, confidence)
+print(dual.summary())
+
+# Sanity check: does RT actually track confidence here?
+print(rt_da.rt_validity(rt, confidence))
+
+# Batch with both modalities side by side
 table = rt_da.fit_group(df, subject="subj", stimulus="stim",
                         response="resp", rt="rt", confidence="conf")
 ```
@@ -132,7 +146,6 @@ time or helped your work, you can support maintenance:
 
 - **Ko-fi (one-time tip):** https://ko-fi.com/trevcaru
 
-No pressure — the package is free regardless.
 
 ## License
 

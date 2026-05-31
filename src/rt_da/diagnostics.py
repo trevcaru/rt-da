@@ -119,7 +119,7 @@ class DualEstimate:
     This is the package's signature output: it never hides the RT estimate
     behind the confidence one (or vice versa). It reports both, their
     agreement, and -- when both are available -- whether RT is behaving as a
-    valid proxy in THIS data. Honest noise, shown not buried.
+    valid proxy in THIS data.
     """
     rt_fit: Optional[SDTFit]
     conf_fit: Optional[SDTFit]
