@@ -136,8 +136,16 @@ across the full range.*
 
 ## Citing
 
-If you use this package, please cite the original method (Miyoshi, Rahnev &
-Lau, 2026, above).
+If you use this package, please cite **both** the software and the original
+method:
+
+- **Method:** Miyoshi, K., Rahnev, D., & Lau, H. (2026). Correcting for
+  unequal variance in signal detection models using response time.
+  *iScience, 29*, 114998. https://doi.org/10.1016/j.isci.2026.114998
+- **Software:** Caruso, T. (2026). *rt-da: RT-based unequal-variance signal
+  detection (da) in Python* (v0.1.0) [Computer software].
+  https://github.com/trevcaru/rt-da — or use the "Cite this repository"
+  button on GitHub (generated from `CITATION.cff`).
 
 ## Support
 
