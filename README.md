@@ -12,12 +12,12 @@ fixes this:
 da = μ / sqrt((1 + σ²) / 2)
 ```
 
-Fitting `da` normally needs multiple points in ROC space, traditionally from
-confidence ratings, which may not be available. This package estimates
-`da` from **response times alone**, using *faster RT as a proxy for higher
-confidence* so you can get unequal-variance sensitivity from plain
-stimulus / response / RT data. (If you *do*have confidence, it will fit that, 
-and can compare the two.) Following:
+Fitting da needs multiple points in ROC space (a single hit/false-alarm pair only determines d′). Classically those points come either from sweeping the decision criterion across conditions — via payoffs or target prevalence — or, within a single block, from a confidence-rating scale whose levels act as multiple simultaneous criteria (Macmillan & Creelman cover both). The rating method is standard and cheap to run, but it can't be applied retroactively: many existing datasets recorded only stimulus, response, and RT. This package recovers da from those alone. Both can require extra design or data you may not have.  
+
+This package estimates`da` from **response times alone**, using *faster RT 
+as a proxy for higher confidence* so you can get unequal-variance sensitivity 
+from plain stimulus / response / RT data. (If you *do*have confidence, it 
+will fit that, and can compare the two.) Following:
 
 > Miyoshi, K., Rahnev, D., & Lau, H. (2026). *Correcting for unequal variance
 > in signal detection models using response time.* iScience 29, 114998.
