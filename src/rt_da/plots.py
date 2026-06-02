@@ -236,11 +236,17 @@ def plot_recovery(true_da, est_da, ax=None, label="da"):
     return ax
 
 
-def plot_overestimation(grp_df, ax=None):
+def plot_overestimation(grp_df, ax=None, title=None):
     """Grouped bar plot of d' vs da(RT) vs da(Conf) (paper Figures 3 & 6).
 
-    Shows that conventional d' overestimates sensitivity relative to both
-    unequal-variance da measures. Bars are dataset means with SEM error bars.
+    Compares conventional equal-variance d' against the two unequal-variance
+    da measures. Bars are dataset means with SEM error bars.
+
+    IMPORTANT: when sigma > 1 the SIGN of (d' - da) is criterion-dependent.
+    At conservative criteria (low FA) d' OVERestimates da (the regime the
+    paper emphasises); at neutral/liberal criteria (c <= 0) d' UNDERestimates
+    da. da itself is criterion-invariant. The default title states the gap
+    without asserting a direction; pass `title=` to override.
     """
     import matplotlib.pyplot as plt  # lazy import
     if ax is None:
@@ -269,11 +275,74 @@ def plot_overestimation(grp_df, ax=None):
 
     ax.set_xticks(xpos)
     ax.set_xticklabels(labels, fontsize=9.5)
-    _style_ax(ax, title="d′ overestimates sensitivity vs da",
+    _style_ax(ax, title=title or "equal-variance d′ vs unequal-variance da",
               ylabel="sensitivity")
     ax.set_ylim(0, max(means) * 1.30)
     ax.grid(axis="x", visible=False)
     return ax
+
+
+def plot_reference_validation(ax=None):
+    """Bar chart: reference R output vs this package on the published example.
+
+    Uses the reference implementation's published count vectors
+    (nr_s1 = [10,7,16,27,29,10], nr_s2 = [43,21,10,12,8,3]) and their reported
+    fit (mu=1.2314, sigma=1.2523, da=1.0867). Bars compare those reference
+    values against what `fit_uvsdt_mle` returns here, demonstrating the port
+    reproduces the original to plotting precision.
+    """
+    import matplotlib.pyplot as plt  # lazy import
+    from .core import fit_uvsdt_mle
+
+    ref = {"μ": 1.2314, "σ": 1.2523, "da": 1.0867}
+    f = fit_uvsdt_mle([10, 7, 16, 27, 29, 10], [43, 21, 10, 12, 8, 3])
+    ours = {"μ": f.mu, "σ": f.sigma, "da": f.da}
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=(5.2, 4.2))
+
+    labels = list(ref.keys())
+    x = np.arange(len(labels))
+    w = 0.36
+    rvals = [ref[k] for k in labels]
+    ovals = [ours[k] for k in labels]
+    b1 = ax.bar(x - w / 2, rvals, w, label="reference R",
+                color=_PALETTE["muted"], edgecolor="white", linewidth=1.2,
+                zorder=3)
+    b2 = ax.bar(x + w / 2, ovals, w, label="this package",
+                color=_PALETTE["present"], edgecolor="white", linewidth=1.2,
+                zorder=3)
+    for bars in (b1, b2):
+        for b in bars:
+            ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.02,
+                    f"{b.get_height():.3f}", ha="center", va="bottom",
+                    fontsize=8.5, color=_PALETTE["accent"])
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=10.5)
+    _style_ax(ax, title="reference R vs this package (published example)",
+              ylabel="estimate")
+    ax.set_ylim(0, max(rvals + ovals) * 1.25)
+    ax.grid(axis="x", visible=False)
+    ax.legend(fontsize=8.5, frameon=False, loc="upper right")
+    return ax
+
+
+def _fit_group_at_criterion(criterion, n_subj=30, n_trials=800, sigma=1.4):
+    """Simulate the standard subject set at a fixed decision criterion and
+    return the group fit. Used to show that da is criterion-invariant while
+    single-point d' is not.
+    """
+    frames = []
+    for subj in range(n_subj):
+        d = simulate_detection(n_trials=n_trials, mu=0.8 + 0.05 * subj,
+                               sigma=sigma, criterion=criterion, seed=subj)
+        d["subject"] = subj
+        frames.append(d)
+    big = pd.concat(frames, ignore_index=True)
+    return fit_group(big, subject="subject", stimulus="stimulus",
+                     response="response", rt="rt", confidence="confidence",
+                     n_bins=3)
 
 
 def _make_plots(save_dir=None, show=True):
@@ -305,7 +374,13 @@ def _make_plots(save_dir=None, show=True):
     paths = []
 
     # ---- Figure 1: model overview — distributions + ROC + z-ROC ----------
-    df = simulate_detection(n_trials=4000, mu=1.5, sigma=1.5, seed=3)
+    # One simulated subject (n=8000) with known mu=1.5, sigma=1.5. The
+    # "empirical" ROC points are these simulated trials binned by RT; the
+    # curve is the UV model fit to them. true da is computed analytically
+    # from the generating parameters, not hard-coded.
+    sim_mu, sim_sigma, sim_n = 1.5, 1.5, 8000
+    true_da = sim_mu / np.sqrt((1.0 + sim_sigma ** 2) / 2.0)
+    df = simulate_detection(n_trials=sim_n, mu=sim_mu, sigma=sim_sigma, seed=3)
     rating = rt_to_bins(df.rt, df.response, n_bins=3)
     na, npz = build_roc_table(df.stimulus, df.response, rating, n_bins=3)
     fit = fit_uv_sdt(na, npz, n_bins=3)
@@ -317,8 +392,8 @@ def _make_plots(save_dir=None, show=True):
     plot_roc(fit, na, npz, ax=fig.add_subplot(gs[1]))
     plot_zroc(fit, na, npz, ax=fig.add_subplot(gs[2]))
     fig.suptitle("RT-based unequal-variance SDT — model overview   "
-                 f"(true da = 1.18, recovered da = {fit.da:.2f}, "
-                 f"σ = {fit.sigma:.2f})",
+                 f"(true da = {true_da:.2f}, RT-recovered da = {fit.da:.2f}, "
+                 f"true σ = {sim_sigma:.1f}, recovered σ = {fit.sigma:.2f})",
                  fontsize=13, fontweight="bold", color=_PALETTE["accent"],
                  y=0.97)
     p = os.path.join(save_dir, "rtda_fig1_model_overview.png")
@@ -336,13 +411,22 @@ def _make_plots(save_dir=None, show=True):
                     response="response", rt="rt", confidence="confidence",
                     n_bins=3)
 
-    # ---- Figure 2: RT vs confidence — scatter + overestimation bars ------
-    fig2 = plt.figure(figsize=(10.5, 4.7))
-    gs2 = fig2.add_gridspec(1, 2, width_ratios=[1, 1], wspace=0.28,
-                            left=0.08, right=0.96, bottom=0.14, top=0.86)
+    # ---- Figure 2: RT vs confidence agreement + criterion-dependent d' ---
+    # Left: da(RT) vs da(Conf) agreement (criterion-invariant).
+    # Middle/right: the SAME subjects refit under a neutral (c=0) and a
+    # conservative (c=0.85) criterion. da is stable; d' swings from BELOW da
+    # to ABOVE da purely from criterion placement -- the reason da is needed.
+    grp_cons = _fit_group_at_criterion(0.85)
+    fig2 = plt.figure(figsize=(13.5, 4.7))
+    gs2 = fig2.add_gridspec(1, 3, width_ratios=[1, 1, 1], wspace=0.30,
+                            left=0.06, right=0.97, bottom=0.14, top=0.84)
     plot_da_scatter(grp["da_rt"], grp["da_conf"], ax=fig2.add_subplot(gs2[0]))
-    plot_overestimation(grp, ax=fig2.add_subplot(gs2[1]))
-    fig2.suptitle("RT vs confidence agreement, and d′ overestimation",
+    plot_overestimation(grp, ax=fig2.add_subplot(gs2[1]),
+                        title="neutral criterion (c=0): d′ < da")
+    plot_overestimation(grp_cons, ax=fig2.add_subplot(gs2[2]),
+                        title="conservative criterion (c=0.85): d′ > da")
+    fig2.suptitle("da agrees across RT and confidence; the d′–da gap is "
+                  "criterion-dependent",
                   fontsize=13, fontweight="bold", color=_PALETTE["accent"],
                   y=0.97)
     p = os.path.join(save_dir, "rtda_fig2_rt_vs_confidence.png")
@@ -363,6 +447,13 @@ def _make_plots(save_dir=None, show=True):
     fig3.tight_layout()
     p = os.path.join(save_dir, "rtda_fig3_recovery.png")
     fig3.savefig(p, dpi=130); paths.append(p)
+
+    # ---- Figure 4: reference R vs this package on the published example --
+    fig4, ax4 = plt.subplots(figsize=(5.6, 4.4))
+    plot_reference_validation(ax=ax4)
+    fig4.tight_layout()
+    p = os.path.join(save_dir, "rtda_fig4_reference_validation.png")
+    fig4.savefig(p, dpi=130); paths.append(p)
 
     if show:
         _show_in_windows(paths)
