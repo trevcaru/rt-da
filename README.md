@@ -123,8 +123,8 @@ fit = rt_da.fit_uvsdt_mle(nr_s1, nr_s2, add_constant=True)
 
 ## Validation
 
-This package is validated against the reference R implementation
-(kiyomiyoshi/rt_type1_roc) at two levels.
+This package is validated against the published reference implementation
+(Miyoshi et al.; kiyomiyoshi/rt_type1_roc) at two levels.
 
 **1. The published example.** Fitting the reference's own published count
 vectors reproduces their reported parameters to the printed digits:
@@ -133,17 +133,21 @@ vectors reproduces their reported parameters to the printed digits:
 fit_uvsdt_mle([10,7,16,27,29,10], [43,21,10,12,8,3])
 ```
 
-| parameter | reference R | this package | abs. diff |
-|-----------|------------:|-------------:|----------:|
-| μ         |      1.2314 |       1.2314 |   < 1e-4  |
-| σ         |      1.2523 |       1.2523 |   < 1e-4  |
-| da        |      1.0867 |       1.0867 |   < 1e-4  |
-| log L     |    −315.88  |     −315.88  |   < 2e-3  |
+| parameter | Miyoshi et al. (published) | rt-da (Python) | abs. diff |
+|-----------|---------------------------:|---------------:|----------:|
+| μ         |                     1.2314 |         1.2314 |   < 1e-4  |
+| σ         |                     1.2523 |         1.2523 |   < 1e-4  |
+| da        |                     1.0867 |         1.0867 |   < 1e-4  |
+| log L     |                   −315.88  |       −315.88  |   < 2e-3  |
 
-![Reference R vs this package on the published example: μ, σ, and da match to plotting precision.](docs/rtda_fig4_reference_validation.png)
+Miyoshi et al. (published) = the parameters reported in the reference paper /
+implementation (kiyomiyoshi/rt_type1_roc); rt-da (Python) = `fit_uvsdt_mle`
+in this package, computed on the same count vectors.
 
-*The reference R implementation and this package return the same μ, σ, and da
-on the published example — the bars are indistinguishable.*
+![Miyoshi et al. (published) vs rt-da (Python) on the published example: μ, σ, and da match to plotting precision.](docs/rtda_fig4_reference_validation.png)
+
+*Miyoshi et al.'s published values and rt-da (Python) return the same μ, σ,
+and da on the published example — the bars are indistinguishable.*
 
 **2. Per-subject estimates on real datasets.** The test suite refits the
 reference implementation's per-subject estimates on the Mazor (2020) and
