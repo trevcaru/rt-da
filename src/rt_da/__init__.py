@@ -34,8 +34,10 @@ Quick start
 Validation
 ----------
 `fit_uvsdt_mle` reproduces the reference implementation's published example
-exactly (mu=1.2314, sigma=1.2523, da=1.0867, logL=-315.88) and matches its
-per-subject estimates on real datasets (see tests/).
+exactly (mu=1.2314, sigma=1.2523, da=1.0867, logL=-315.88) and matches the
+authors' own R (uvsdt.R) per-subject to optimizer precision (da within 2.5e-3
+across 80 subject-fits) on the Mazor 2020 and Sherman 2016 datasets. See the
+`validation/` suite.
 """
 
 from .core import (

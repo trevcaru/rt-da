@@ -45,7 +45,7 @@ def fit_group(df: pd.DataFrame,
                           n_bins=n_bins, stabilize=stabilize)
                 row.update({f"{k}_rt": v for k, v in f.as_dict().items()
                             if k in ("mu", "sigma", "da", "dprime",
-                                     "criterion", "converged")})
+                                     "criterion", "converged", "valid")})
             except Exception:
                 row.update({f"{k}_rt": np.nan for k in
                             ("mu", "sigma", "da", "dprime", "criterion")})
@@ -57,7 +57,7 @@ def fit_group(df: pd.DataFrame,
                                n_bins=n_bins, stabilize=stabilize)
                 row.update({f"{k}_conf": v for k, v in f.as_dict().items()
                             if k in ("mu", "sigma", "da", "dprime",
-                                     "criterion", "converged")})
+                                     "criterion", "converged", "valid")})
             except Exception:
                 row.update({f"{k}_conf": np.nan for k in
                             ("mu", "sigma", "da", "dprime", "criterion")})
