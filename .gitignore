@@ -9,3 +9,10 @@ venv/
 *.png
 !docs/*.png
 .DS_Store
+.claude/
+
+# Authors' raw datasets and the paper PDF live in docs/ as local reference
+# material only -- not redistributed in the repo. The validation suite does
+# not need them (it ships derived fixtures under validation/).
+docs/*.csv
+docs/*.pdf

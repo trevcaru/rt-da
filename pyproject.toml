@@ -41,5 +41,7 @@ Funding = "https://ko-fi.com/trevcaru"
 where = ["src"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-filterwarnings = ["ignore::RuntimeWarning"]
+testpaths = ["tests", "validation"]
+# The fit objective is smooth (no inf/NaN cliff), so the blanket
+# RuntimeWarning suppression that used to hide the optimizer's NaN-gradient
+# warnings is no longer needed.

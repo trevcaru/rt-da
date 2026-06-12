@@ -119,6 +119,40 @@ def test_fit_group_returns_row_per_subject():
     assert "da_conf" in g.columns
 
 
+def test_valid_implies_converged_and_sane():
+    """The A2 contract: valid=True must imply genuine convergence AND sane
+    estimates (finite mu/da, 0.1<sigma<8, finite strictly-ordered criteria).
+    """
+    import numpy as np
+    rng = np.random.default_rng(0)
+    seen_valid = False
+    for seed in range(12):
+        df = rt_da.simulate_detection(n_trials=1500, mu=1.3, sigma=1.4,
+                                      seed=seed)
+        for f in (rt_da.rt_da(df.stimulus, df.response, df.rt, n_bins=3),
+                  rt_da.fit_ratings(df.stimulus, df.response, df.confidence,
+                                    n_bins=3)):
+            if f.valid:
+                seen_valid = True
+                assert f.converged
+                assert np.isfinite(f.mu) and np.isfinite(f.da)
+                assert 0.1 < f.sigma < 8.0
+                assert np.all(np.isfinite(f.criteria))
+                assert np.all(np.diff(f.criteria) > 0)  # strictly ordered
+    assert seen_valid  # the gate is not vacuously rejecting everything
+
+
+def test_no_runtime_warnings_from_fit(recwarn):
+    """The smooth objective must not emit the NaN-gradient RuntimeWarnings the
+    old inf-cliff did (we no longer suppress them in pyproject)."""
+    import warnings
+    df = rt_da.simulate_detection(n_trials=1200, mu=1.5, sigma=1.5, seed=2)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        rt_da.rt_da(df.stimulus, df.response, df.rt, n_bins=3)
+        rt_da.fit_uvsdt_mle([10, 7, 16, 27, 29, 10], [43, 21, 10, 12, 8, 3])
+
+
 def test_add_constant_default_is_one_over_cells():
     """add_constant must add 1/(2n) per cell to match the reference."""
     nr1 = np.array([10, 7, 16, 27, 29, 10], float)

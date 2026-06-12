@@ -1,8 +1,11 @@
 """Core unequal-variance SDT fitting (RT-based da).
 
-Direct port of the reference implementation (Miyoshi et al. 2026,
-kiyomiyoshi/rt_type1_roc: uvsdt.R), validated to reproduce its published
-example exactly and its per-subject estimates on real datasets.
+Independent reimplementation following the logic of the reference
+(Miyoshi et al. 2026, kiyomiyoshi/rt_type1_roc: uvsdt.R). It reproduces the
+authors' published example to the printed digits and matches their
+per-subject mu/sigma/da/logL to optimizer precision against their own R --
+see the `validation/` suite. The model is fit in a smooth, unconstrained
+parameterization (see `_unpack`) so the optimizer is well-behaved.
 """
 from __future__ import annotations
 
@@ -41,10 +44,11 @@ class SDTFit:
     converged : bool
         Whether the optimizer reported success.
     valid : bool
-        Whether the fit is usable: converged AND not pinned to a parameter
-        boundary (e.g. sigma not maxed out). Degenerate fits get valid=False
-        so they can be excluded, mirroring the reference R pipeline's
-        convergence-based subject exclusions.
+        Whether the fit is usable: the optimizer converged (`converged`) AND
+        the estimates pass sanity bounds (finite mu/da, 0.1 < sigma < 8,
+        finite strictly-ordered criteria). Degenerate / non-converged fits get
+        valid=False so they can be excluded, mirroring the reference R
+        pipeline's na.omit-based subject exclusions.
     n_trials : int
         Number of trials that entered the fit.
     """
@@ -177,8 +181,11 @@ def build_roc_table(stimulus: Sequence[int],
     n_bins : int
         Number of rating levels.
     stabilize : float, optional
-        Constant added to every cell (their `add_constant`). The paper /
-        their code default is 1 / total_trials. If None, that is applied.
+        Constant added to every cell (their `add_constant`). If None, the
+        reference default of 1 / (number of cells) = 1/(2*n_bins) is applied
+        (this is what their code uses and what reproduces their numbers; the
+        paper prose says 1/total_trials, but the code -- which we match --
+        uses 1/(2n)).
 
     Returns
     -------
@@ -217,45 +224,75 @@ def build_roc_table(stimulus: Sequence[int],
 
 
 # ---------------------------------------------------------------------------
-# The unequal-variance SDT likelihood + fit.
-# This is a direct port of the authors' reference implementation (uvsdt.R:
-# uvsdt_logL + fit_uvsdt_mle), so per-subject estimates match theirs.
+# The unequal-variance SDT likelihood + fit. Same likelihood as the authors'
+# reference (uvsdt.R: uvsdt_logL + fit_uvsdt_mle), re-expressed in a smooth
+# unconstrained parameterization; per-subject estimates match theirs to
+# optimizer precision.
 # ---------------------------------------------------------------------------
+
+def _softplus(x: np.ndarray) -> np.ndarray:
+    """Numerically stable softplus, log(1 + exp(x)) > 0 for all finite x."""
+    return np.logaddexp(0.0, x)
+
+
+def _softplus_inv(y: np.ndarray) -> np.ndarray:
+    """Inverse softplus for y > 0: log(exp(y) - 1), stable via expm1."""
+    return np.log(np.expm1(y))
+
+
+def _unpack(params: np.ndarray, n_ratings: int):
+    """Map the unconstrained optimizer vector to (mu, sigma, cri).
+
+    The model is fit in a SMOOTH, UNCONSTRAINED parameterization so the
+    objective has no inf/NaN cliff and SciPy's convergence flag is reliable:
+
+        params = [mu, log_sigma, c0, d_1, ..., d_{2n-2}]
+        sigma  = exp(log_sigma)                          (> 0 structurally)
+        cri[0] = c0
+        cri[k] = cri[k-1] - softplus(d_k)                (strictly decreasing)
+
+    Because the criteria are strictly decreasing, Phi(-cri) and
+    Phi((mu-cri)/sigma) are strictly increasing, so every predicted cell
+    probability (their successive differences) is > 0 by construction --
+    no ordering penalty or +inf fallback is needed. This is mathematically
+    identical to the free-criterion model; only the path is reparameterized.
+    """
+    mu = params[0]
+    sigma = np.exp(params[1])
+    c0 = params[2]
+    deltas = params[3:2 * n_ratings + 1]            # length 2n-2
+    gaps = _softplus(deltas)                          # strictly positive
+    cri = c0 - np.concatenate(([0.0], np.cumsum(gaps)))
+    return mu, sigma, cri
+
 
 def _neg_log_likelihood(params: np.ndarray,
                         nr_s1: np.ndarray,
                         nr_s2: np.ndarray,
                         n_ratings: int) -> float:
-    """Negative log-likelihood, ported verbatim from uvsdt_logL (uvsdt.R).
+    """Negative log-likelihood of the unequal-variance SDT model.
 
-    params = [mu, sigma, cri_1, ..., cri_{2n-1}].
-    Target-absent (S1) ~ N(0, 1); target-present (S2) ~ N(mu, sigma).
-    Predicted cumulative rates use the authors' criterion convention:
-        pred_far = [0, Phi(0 - cri),            1]
-        pred_hr  = [0, Phi((mu - cri)/sigma),   1]
-    Cell probabilities are the successive diffs. If any diff is <= 0 the
-    log is NaN, which (as in the R code) is mapped to +inf (worst score),
-    so the optimizer simply avoids those regions -- no sorting or penalty
-    term is needed.
+    Same likelihood as the reference uvsdt_logL (uvsdt.R) -- multinomial
+    `sum(n * log(p))` over the cells -- but evaluated through the smooth
+    `_unpack` parameterization so it is finite and differentiable
+    everywhere. Target-absent (S1) ~ N(0, 1); target-present (S2) ~
+    N(mu, sigma); cell probabilities are the successive differences of
+        pred_far = [0, Phi(0 - cri),          1]
+        pred_hr  = [0, Phi((mu - cri)/sigma), 1].
     """
-    mu = params[0]
-    sigma = params[1]
-    cri = params[2:2 * n_ratings + 1]
-
-    if sigma <= 0:
-        return np.inf
+    mu, sigma, cri = _unpack(params, n_ratings)
 
     pred_far = np.concatenate(([0.0], norm.cdf(0.0 - cri), [1.0]))
     pred_hr = np.concatenate(([0.0], norm.cdf((mu - cri) / sigma), [1.0]))
 
-    pred_nr_s1 = nr_s1.sum() * np.diff(pred_far)
-    pred_nr_s2 = nr_s2.sum() * np.diff(pred_hr)
+    # Successive differences are positive by construction; clip only to
+    # avoid log(0) from float underflow far out in parameter space.
+    p1 = np.maximum(np.diff(pred_far), 1e-300)
+    p2 = np.maximum(np.diff(pred_hr), 1e-300)
 
-    with np.errstate(divide="ignore", invalid="ignore"):
-        ll = np.sum(nr_s1 * np.log(pred_nr_s1 / nr_s1.sum())) + \
-            np.sum(nr_s2 * np.log(pred_nr_s2 / nr_s2.sum()))
+    ll = np.sum(nr_s1 * np.log(p1)) + np.sum(nr_s2 * np.log(p2))
     if not np.isfinite(ll):
-        return np.inf
+        return 1e12
     return -ll
 
 
@@ -284,44 +321,53 @@ def fit_uv_sdt(nr_absent: Sequence[float],
         n_bins = nr_s1.size // 2
     n_ratings = n_bins
 
-    # Initial guess, exactly as in uvsdt.R:
-    #   rating_far = cumsum(nr_s1)/sum(nr_s1);  rating_hr = cumsum(nr_s2)/sum
-    #   mu  = qnorm(rating_hr[n]) - qnorm(rating_far[n])
-    #   sigma = 1.5
-    #   cri = -qnorm(rating_far)[1:(2n-1)]
+    # Initial guess. Same data-driven seed as uvsdt.R --
+    #   rating_far = cumsum(nr_s1)/sum;  rating_hr = cumsum(nr_s2)/sum
+    #   mu  = qnorm(rating_hr[n]) - qnorm(rating_far[n]);  sigma = 1.5
+    #   cri = -qnorm(rating_far)[1:(2n-1)]   (strictly decreasing)
+    # -- re-expressed in the smooth parameterization of `_unpack`:
+    #   [mu, log(sigma), c0=cri[0], softplus_inv(gaps between criteria)].
     rating_far = np.cumsum(nr_s1) / nr_s1.sum()
     rating_hr = np.cumsum(nr_s2) / nr_s2.sum()
     # clip only to keep qnorm finite at the seed (does not affect the fit)
     rf = np.clip(rating_far, 1e-6, 1 - 1e-6)
     rh = np.clip(rating_hr, 1e-6, 1 - 1e-6)
     mu0 = norm.ppf(rh[n_ratings - 1]) - norm.ppf(rf[n_ratings - 1])
-    sigma0 = 1.5
-    cri0 = (-norm.ppf(rf))[:2 * n_ratings - 1]
-    guess = np.concatenate(([mu0, sigma0], cri0))
+    cri0 = (-norm.ppf(rf))[:2 * n_ratings - 1]        # decreasing seed
+    gaps0 = np.clip(-np.diff(cri0), 1e-6, None)       # positive gaps
+    guess = np.concatenate(([mu0, np.log(1.5), cri0[0]],
+                            _softplus_inv(gaps0)))
 
-    # Fit with BFGS, matching the reference (suppressWarnings(optim(...,
-    # method = "BFGS", maxit = 10000))).
+    # Fit the (now smooth, unconstrained) objective with L-BFGS-B. It finds
+    # the same optimum as the reference's plain BFGS but, unlike SciPy's BFGS,
+    # does not raise spurious "precision loss" (status 2) failures at flat
+    # optima -- so res.success is a trustworthy convergence signal here.
     res = minimize(
         _neg_log_likelihood, guess,
         args=(nr_s1, nr_s2, n_ratings),
-        method="BFGS",
+        method="L-BFGS-B",
         options={"maxiter": 10000},
     )
 
-    mu, sigma = float(res.x[0]), float(res.x[1])
+    mu, sigma, cri = _unpack(res.x, n_ratings)
+    mu = float(mu)
+    sigma = float(sigma)
     da = mu / np.sqrt((1.0 + sigma ** 2) / 2.0)
 
-    # Criteria, output in the reference's reversed order. In R (1-indexed):
-    #   cri[i] = fit$par[2n + 2 - i]  for i = 1..2n-1  -> par indices 2n+1..3
-    # In 0-indexed Python that is par[2n] down to par[2].
-    par = res.x
-    criteria = np.array([par[2 * n_ratings - i]
-                         for i in range(2 * n_ratings - 1)])
+    # Output criteria in the reference's order (ascending along the evidence
+    # axis): the internal `cri` is strictly decreasing, so reverse it.
+    criteria = cri[::-1].copy()
 
-    # Validity: the reference keeps any fit that did not error and is finite
-    # (it relies on na.omit + d'>=0 downstream rather than parameter ceilings).
-    valid = bool(np.isfinite(mu) and np.isfinite(sigma) and sigma > 0
-                 and np.isfinite(da) and np.all(np.isfinite(criteria)))
+    # Validity: now that the objective is smooth, gate on genuine convergence
+    # plus sanity bounds. sigma is structurally > 0 and the criteria are
+    # structurally monotone; we still assert finiteness and a sane sigma range
+    # so degenerate/non-converged fits (the ones the reference pipeline drops
+    # via na.omit / d'>=0) come back valid=False and can be excluded.
+    valid = bool(res.success
+                 and np.isfinite(mu) and np.isfinite(da)
+                 and 0.1 < sigma < 8.0
+                 and np.all(np.isfinite(criteria))
+                 and np.all(np.diff(criteria) > 0))
 
     # Conventional equal-variance d' from the single yes/no midpoint.
     # Paper ordering: cells 1..n are "yes", n+1..2n are "no".
@@ -354,8 +400,8 @@ def fit_uvsdt_mle(nr_s1, nr_s2, add_constant: bool = True) -> SDTFit:
     (kiyomiyoshi/rt_type1_roc): `nr_s1` and `nr_s2` are response-frequency
     vectors for S1 (target-absent) and S2 (target-present) trials, ordered
     from "fastest-RT / highest-confidence Yes" to "fastest-RT / highest-
-    confidence No". `add_constant=True` adds 1/sum(counts) to each cell for
-    stability (their default).
+    confidence No". `add_constant=True` adds 1/(number of cells) = 1/(2n) to
+    each cell for stability (their default).
 
     Returns an SDTFit with mu, sigma, da, the criteria (cri.X1..), and logL,
     so results can be checked directly against the paper's example.
@@ -400,7 +446,7 @@ def rt_da(stimulus, response, rt, n_bins=3, stabilize=None) -> SDTFit:
     response : array-like, 1 = "yes", 0/2 = "no"
     rt : array-like of float, response times (positive)
     n_bins : int, number of RT quantile bins (match your confidence scale)
-    stabilize : float, optional cell constant (default 1 / n_trials)
+    stabilize : float, optional cell constant (default 1/(2*n_bins))
     """
     rating = rt_to_bins(rt, response, n_bins=n_bins)
     return fit_ratings(stimulus, response, rating, n_bins=n_bins,

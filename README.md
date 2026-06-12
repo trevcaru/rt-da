@@ -47,8 +47,10 @@ them. RT-based da runs slightly below the true value, as the method expects.*
 - **Python-native.** The reference implementation is R; this fits cleanly into
   PsychoPy / pandas / SciPy workflows.
 - **Validated against the published method.** `fit_uvsdt_mle` reproduces the
-  reference example *exactly* and matches its per-subject estimates on real
-  datasets (Mazor 2020, Sherman 2016). See `tests/`.
+  reference example *exactly*, and matches the authors' own R (`uvsdt.R`)
+  per-subject **to optimizer precision** (da within 2.5e-3 across 80
+  subject-fits) on the Mazor (2020) and Sherman (2016) datasets. See
+  `validation/`.
 - **Does more than the paper packages:** RT-validity diagnostics, bootstrap
   confidence intervals, tidy group-level batch fitting, and publication-style
   plots are all included.
@@ -59,9 +61,10 @@ them. RT-based da runs slightly below the true value, as the method expects.*
 
 ![RT-based da agrees closely with confidence-based da; the gap between d′ and da depends on the criterion.](docs/rtda_fig2_rt_vs_confidence.png)
 
-*Left: RT-based and confidence-based da agree closely across subjects (da is
-criterion-invariant). Middle/right: the same subjects refit under a neutral
-(c = 0) and a conservative (c = 0.85) criterion. da barely moves, but
+*All three panels use **simulated** subjects (30 simulated detection datasets).
+Left: RT-based and confidence-based da agree closely across subjects (da is
+criterion-invariant). Middle/right: the same simulated subjects refit under a
+neutral (c = 0) and a conservative (c = 0.85) criterion. da barely moves, but
 single-point equal-variance d′ swings from below da to above da purely from
 where the criterion sits — which is why a criterion-free sensitivity index
 like da is worth computing. When σ > 1, the sign of (d′ − da) is
@@ -149,13 +152,33 @@ in this package, computed on the same count vectors.
 *Miyoshi et al.'s published values and rt-da (Python) return the same μ, σ,
 and da on the published example — the bars are indistinguishable.*
 
-**2. Per-subject estimates on real datasets.** The test suite refits the
-reference implementation's per-subject estimates on the Mazor (2020) and
-Sherman (2016) datasets and asserts agreement; see `tests/`. Run the suite:
+**2. Per-subject estimates on real datasets, against the authors' own R.**
+The `validation/` suite refits the Mazor (2020) and Sherman (2016) datasets
+and checks each subject's μ, σ, da, and log-likelihood against the values
+produced by the authors' `uvsdt.R` on the identical count vectors. Across
+**80 subject-fits** (RT and confidence, three datasets) the package matches
+their R to optimizer precision: **da within 2.5e-3**, log-likelihood within
+4e-4. The dataset-level RT-vs-confidence da correlations also reproduce:
+
+| dataset | rt-da (this package) | paper, Fig. 9 |
+|---------|---------------------:|--------------:|
+| Mazor 2020 (detection) | 0.91 | 0.90 |
+| Sherman 2016 JOCN_1    | 0.73¹ | 0.73 |
+| Sherman 2016 JOCN_2    | 0.87 | 0.86 |
+
+¹ On the authors' exclusion set. One subject (JOCN_1 id 7) is dropped by the
+reference pipeline because R's optimizer *errors* on it; this package fits it
+without error. Including it (as the package's default would) raises the
+correlation to ~0.80 — an optimizer-robustness difference, not a fitting
+error. The `validation/` tests cover both the excluded-set value (0.73) and
+the included value (~0.80) so the distinction is explicit.
+
+The fixtures are self-contained (derived count vectors + the R reference
+values), so the suite needs neither the raw data nor an R interpreter:
 
 ```bash
 pip install "rt-da[dev]"
-pytest
+pytest                      # runs tests/ and validation/
 ```
 
 ![Parameter recovery: estimated da closely tracks true da across simulated subjects.](docs/rtda_fig3_recovery.png)
